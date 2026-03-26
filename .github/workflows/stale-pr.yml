@@ -3,7 +3,7 @@ name: Immediate Stale & Close PRs
 on:
   workflow_dispatch:   # 👈 Run manually (immediate)
   schedule:
-    - cron: '*/5 * * * *'  # 👈 Optional: runs every 5 min (temporary)
+    - cron: '* * * * *'  # 👈 Optional: runs every 5 min (temporary)
 
 jobs:
   stale:
