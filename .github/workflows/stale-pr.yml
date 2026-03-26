@@ -3,7 +3,7 @@ name: Stale & Close PRs (App Token)
 on:
   workflow_dispatch:   # run manually now
   schedule:
-    - cron: '0 0 * * *'   # daily
+    - cron: '* * * * *'   # daily
 
 jobs:
   stale-close:
