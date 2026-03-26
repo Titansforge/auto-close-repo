@@ -1,31 +1,89 @@
-name: Immediate Stale & Close PRs
+name: Stale → Destroy → Close PRs
 
 on:
-  workflow_dispatch:   # 👈 Run manually (immediate)
+  workflow_dispatch:
   schedule:
-    - cron: '* * * * *'  # 👈 Optional: runs every 5 min (temporary)
+    - cron: '* * * * *'   # ⚠️ every minute (temporary)
 
 jobs:
-  stale:
+  cleanup:
     runs-on: ubuntu-latest
 
     permissions:
       pull-requests: write
       issues: write
+      contents: read
 
     steps:
-      - name: Close all open PRs immediately
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Mark PRs as stale (DO NOT close)
         uses: actions/stale@v9
         with:
           repo-token: ${{ github.token }}
-
           only-prs: true
 
           days-before-pr-stale: 0
-          days-before-pr-close: 0
+          days-before-pr-close: -1   # 👈 prevent auto-close
 
           stale-pr-label: 'stale'
           stale-pr-message: 'Marking this PR as stale.'
-          close-pr-message: 'Closing this PR as part of repository cleanup.'
 
           operations-per-run: 100
+
+      - name: Get stale PRs
+        id: stale_prs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+
+            const stalePRs = prs.data
+              .filter(pr => pr.labels.some(label => label.name === 'stale'))
+              .map(pr => pr.number);
+
+            core.setOutput("prs", JSON.stringify(stalePRs));
+
+      - name: Setup Terraform
+        if: steps.stale_prs.outputs.prs != '[]'
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Destroy resources for each stale PR
+        if: steps.stale_prs.outputs.prs != '[]'
+        run: |
+          PRS=$(echo '${{ steps.stale_prs.outputs.prs }}' | jq -r '.[]')
+          for pr in $PRS; do
+            echo "Processing PR #$pr"
+
+            # Download tfstate artifact for this PR
+            gh run download --name tfstate-$pr || echo "No state found for PR $pr"
+
+            terraform init
+
+            terraform destroy -auto-approve || echo "Nothing to destroy for PR $pr"
+
+            rm -f terraform.tfstate terraform.tfstate.backup || true
+          done
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Close stale PRs
+        if: steps.stale_prs.outputs.prs != '[]'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prs = JSON.parse('${{ steps.stale_prs.outputs.prs }}');
+
+            for (const pr of prs) {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr,
+                state: 'closed'
+              });
+            }
