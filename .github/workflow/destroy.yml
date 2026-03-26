@@ -1,0 +1,26 @@
+name: Destroy Local Terraform
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  destroy:
+    # Only run when PR is closed (not merged OR merged — your choice)
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Init
+        run: terraform init
+
+      - name: Destroy
+        run: terraform destroy -auto-approve
