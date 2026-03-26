@@ -1,0 +1,31 @@
+name: Immediate Stale & Close PRs
+
+on:
+  workflow_dispatch:   # 👈 Run manually (immediate)
+  schedule:
+    - cron: '*/5 * * * *'  # 👈 Optional: runs every 5 min (temporary)
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Close all open PRs immediately
+        uses: actions/stale@v9
+        with:
+          repo-token: ${{ github.token }}
+
+          only-prs: true
+
+          days-before-pr-stale: 0
+          days-before-pr-close: 0
+
+          stale-pr-label: 'stale'
+          stale-pr-message: 'Marking this PR as stale.'
+          close-pr-message: 'Closing this PR as part of repository cleanup.'
+
+          operations-per-run: 100
