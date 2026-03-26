@@ -16,7 +16,7 @@ resource "random_pet" "name" {
   length = 2
 }
 
-resource "null_resource" "example1" {
+resource "null_resource" "example2" {
   triggers = {
     name = random_pet.name.id
   }
